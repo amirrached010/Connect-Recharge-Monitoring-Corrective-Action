@@ -101,7 +101,7 @@ public class SendThread implements Runnable {
             logger.debug("Request for GetOffers ");
             response = sendRequest(request);
             String status = parseResponse(response);
-            logger.debug("Reponse for GetOffers : "+status);
+            logger.debug("Response for GetOffers : "+status);
             if(status.equals("0")){
                 
                 String offers = parseGerOffers(response);
