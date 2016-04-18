@@ -41,13 +41,13 @@ public class Air {
         executor.shutdown();
     }
     
-    public void addRequest(ArrayList<String> inputList,Properties properties)
+    public void addRequest(ArrayList<String> inputList,Properties properties, int counter)
     {
        
        // System.out.println(xml);
         
         executor.execute(new SendThread(url, inputList,password, 
-             properties));
+             properties,counter));
         
     }
       

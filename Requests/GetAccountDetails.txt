@@ -3,7 +3,7 @@
 <methodName>GetAccountDetails</methodName>
 <params><param><value><struct>
 <member><name>originTransactionID</name><value><string>2000</string></value></member>
-<member><name>originTimeStamp</name><value><dateTime.iso8601>20110105T10:50:27+0800</dateTime.iso8601></value></member>
+<member><name>originTimeStamp</name><value><dateTime.iso8601>$originTimeStamp</dateTime.iso8601></value></member>
 <member><name>originHostName</name><value><string>VASP</string></value></member>
 <member><name>subscriberNumberNAI</name><value><int>2</int></value></member>
 <member><name>originNodeType</name><value><string>EXT</string></value></member>

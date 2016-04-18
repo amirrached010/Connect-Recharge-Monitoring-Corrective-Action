@@ -24,8 +24,9 @@ public class Globals {
     public static final boolean OS_WIN = true;
     public static final boolean OS_UNIX = false;
     public static boolean IS_OSWIN;
-    public static ArrayList<String> suitableSCs;
+    
+    
     public static enum UCIPRequest {
-        UpdateOffer,AddPam,GetAccountDetails,ResetFiveAccumulator
+        UpdateOffer,AddPam,GetAccountDetails,ResetFiveAccumulator,GetOffers,RunPam,UpdateOfferWithExpiry
     }
 }

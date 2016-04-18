@@ -30,37 +30,35 @@ public class UpdateMain {
     static Logger logger;
     static Properties properties;
     static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    
-    public static void main(String [] args)
+    static ArrayList<ArrayList<String>> great_List = new ArrayList<ArrayList<String>>();
+    public static void main1(String [] args)
     {
         logger = Logger.getLogger(UpdateMain.class);
-        Util.intializeLogger(logger,"GreyAcquisitions");
+        Util.intializeLogger(logger,"Connect-Recharge-Monitoring-Corrective-Action");
         
         if(!initiatePropertiesFile())
             return;
         
-        Globals.DIRECTORY_PATH =properties.getProperty("HOME_DIRECTORY");
         Util.setGlobals();
-        logger.debug("GreyAcquisitions's Input Folder : " + Globals.WATCHED_DIRECTORY);
-        Globals.IS_OSWIN = Util.getOSType();
+        logger.debug("Connect-Recharge-Monitoring-Corrective-Action's Input Folder : " + Globals.WATCHED_DIRECTORY);
         File file = new File(Globals.WATCHED_DIRECTORY);
-
-        RoundRobin <Air> AirList= new RoundRobin <Air>();
-        Globals.suitableSCs = new ArrayList<String>();
-        initializeSCs(AirList);
+        
+        
         while(true){
-            initializeAirs(AirList);
+            RoundRobin <Air> AirList= new RoundRobin <Air>();
+            //initializeAirs(AirList);
             try{
-                Util.checkLogCapacity(logger,"GreyAcquisitions");
+                Util.checkLogCapacity(logger,"Connect-Recharge-Monitoring-Corrective-Action");
             } catch(Exception ex){
                 logger.error("Error in checking for log file size");
             }
             File[] directoryListing = file.listFiles();
+            
             if(directoryListing != null && directoryListing.length > 0){
                 logger.debug("Number of files in the Watched folder is : "+ directoryListing.length);
                 for(int i=0; i< directoryListing.length;i++){
                     try {
-                        Util.archiveWatchDoLogFile(logger,"GreyAcquisitions");
+                        Util.archiveWatchDoLogFile(logger,"Connect-Recharge-Monitoring-Corrective-Actiono");
                     } catch(Exception ex){
                         logger.error("Error in accumulating Watch Dog logs : " + ex);
                     }
@@ -79,8 +77,13 @@ public class UpdateMain {
                 }
                 
             }
-            for(int i=0;i<AirList.size();i++)
-                AirList.next().shutDown();
+            
+            try{
+                 for(int i=0;i<AirList.size();i++)
+                    AirList.next().shutDown();
+            }catch(Exception e){
+                logger.error("Error in shutting down Airs");
+            }
         }
         
      
@@ -115,17 +118,7 @@ public class UpdateMain {
         }
         
     }
-    
-    public static void initializeSCs(RoundRobin <Air> AirList){
-        for(Entry<Object, Object> e : properties.entrySet()) {
-            if(((String) e.getKey()).startsWith("SC_")){
-                String value = (String) e.getValue();
-                Globals.suitableSCs.add(value);
-            }
-        }
-        
-    }
-    
+
     public static void HandleFile(File file,RoundRobin <Air> AirList){
         
         if(!file.exists())
@@ -134,7 +127,8 @@ public class UpdateMain {
                 System.exit(0);
         }
         
-        BufferedReader reader = null;
+        FileInputStream inputStream = null;
+        Scanner sc = null;
         
         int numberOfThreads = Integer.parseInt(properties.getProperty("NumberOfThreads"));
         
@@ -143,47 +137,70 @@ public class UpdateMain {
         int linesPerThreadNumber = Util.getLinesNumberInAFile(file)/numberOfThreads;
         
         try {
-            reader = new BufferedReader(new FileReader(file));
+            inputStream = new FileInputStream(file.getAbsolutePath());
+            sc = new Scanner(inputStream, "UTF-8");
             String text = null;
             ArrayList<String> linesPerThread = new ArrayList<String>();
-            while ((text = reader.readLine()) != null) {
-                
+            while (sc.hasNextLine()) {
+                text = sc.nextLine();
                 text=text.trim();
-                String [] parts=text.split(",");
                 
-                if(parts.length!=2)
-                {
-                    //System.out.println(parts.length);
-                    continue;
-                }
+                String msisdn= text;
                 
-                //Split input file 
-                String msisdn= parts[0];
-                String offerId = parts[1];
                 
                 if(linesPerThreadNumber > 0){
                     if(counter >= linesPerThreadNumber){
-                        AirList.next().addRequest(linesPerThread,properties);
+                        great_List.add(linesPerThread);
+                        
                         linesPerThread = new ArrayList<String>();
                         counter = 0;
                     }
-                    linesPerThread.add(text);
+                    linesPerThread.add(msisdn);
                     counter ++;
-                } else {
+                }   else {
                     linesPerThread = new ArrayList<String>();
-                    linesPerThread.add(text);
+                    linesPerThread.add(msisdn);
                     counter ++;
-                    AirList.next().addRequest(linesPerThread,properties);
+                    great_List.add(linesPerThread);
+                    
                 }
             }
-           
+            great_List.add(linesPerThread);
+//            for(int i=0; i<great_List.size(); i++){
+//                Air a = AirList.next();
+//                a.addRequest(great_List.get(i),properties,i);
+//            }
+            for(int i=0; i<great_List.size(); i++){
+                SendThread a = new SendThread(properties.getProperty("AIR_1_URL"),great_List.get(i),properties.getProperty("AIR_1_PASSWORD"),properties,i);
+                a.run();
+            }
             
-            
-            
-        } catch (Exception e) {
-            e.getMessage();
-            e.printStackTrace();
-            
+           if (sc.ioException() != null) {
+                throw sc.ioException();
+            }
+        } 
+        catch (FileNotFoundException ex) {
+            logger.error("Method : processFile");
+            logger.error("File not found exception for file : " + file.getAbsolutePath());
+        }
+        catch(IOException ex){
+            logger.error("Method : processFile");
+            logger.error("Error in parsing file : " + file.getAbsolutePath());
+        }
+        finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException ex) {
+                    logger.error("Method : processFile");
+                    logger.error("Error in closing input stream while parsing file : " + file.getAbsolutePath());
+                }
+            }
+            if (sc != null) {
+                sc.close();
+                logger.debug("Scanner is closing for file : "+file.getName());
+                
+            }
         }
         try {
             logger.debug("File : "+ file.getAbsolutePath() + " is getting archived");
@@ -251,7 +268,7 @@ public class UpdateMain {
 //                logger.debug("work file "+newFile.getName()+" was not archived");
 //            }
         }catch(Exception e){
-            logger.error("Error in moving the file : "+ currentFile.getName() + " To the archive folder");
+            logger.error("Error in moving the file : "+ currentFile.getAbsolutePath() + " To the archive folder : " + newFile.getAbsolutePath());
             logger.error(e);
         }
      

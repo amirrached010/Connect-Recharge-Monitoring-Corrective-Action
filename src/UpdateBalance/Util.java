@@ -2,6 +2,7 @@ package UpdateBalance;
 
 
 import static UpdateBalance.UpdateMain.logger;
+import static UpdateBalance.UpdateMain.properties;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -65,12 +66,14 @@ public class Util {
     }
         
     public static void setGlobals(){
-//        Globals.WATCHED_DIRECTORY=DIRECTORY_PATH+"INPUT\\Ready\\";
-//        Globals.WORK_DIRECTORY=DIRECTORY_PATH+"INPUT\\Work\\";
-//        Globals.SMS_PREPARATION_DIRECTORY=DIRECTORY_PATH+"SMSPreparation\\";    
-//        Globals.INSTANT_LOG_PATH= DIRECTORY_PATH+"logs\\";   
-//        Globals.ARCHIVE_LOG_DIRECTORY = DIRECTORY_PATH+"ArchiveLog\\";
-//        Globals.ARCHIVE_DIRECTORY = DIRECTORY_PATH+"Archive\\";
+        Globals.DIRECTORY_PATH =properties.getProperty("HOME_DIRECTORY");  
+        
+//        Globals.WATCHED_DIRECTORY=Globals.DIRECTORY_PATH+"INPUT\\Ready\\";
+//        Globals.WORK_DIRECTORY=Globals.DIRECTORY_PATH+"INPUT\\Work\\";
+//        Globals.SMS_PREPARATION_DIRECTORY=Globals.DIRECTORY_PATH+"SMSPreparation\\";    
+//        Globals.INSTANT_LOG_PATH= Globals.DIRECTORY_PATH+"logs\\";   
+//        Globals.ARCHIVE_LOG_DIRECTORY = Globals.DIRECTORY_PATH+"ArchiveLog\\";
+//        Globals.ARCHIVE_DIRECTORY = Globals.DIRECTORY_PATH+"Archive\\";
         
         Globals.WATCHED_DIRECTORY=Globals.DIRECTORY_PATH+"INPUT/Ready/";
         Globals.WORK_DIRECTORY=Globals.DIRECTORY_PATH+"INPUT/Work/";
@@ -78,6 +81,8 @@ public class Util {
         Globals.INSTANT_LOG_PATH =Globals.DIRECTORY_PATH+"logs/";   
         Globals.ARCHIVE_LOG_DIRECTORY =Globals.DIRECTORY_PATH+"ArchiveLog/";
         Globals.ARCHIVE_DIRECTORY = Globals.DIRECTORY_PATH+"Archive/";
+        
+        Globals.IS_OSWIN = getOSType();
     }
 
     public static boolean getOSType(){
@@ -108,7 +113,6 @@ public class Util {
                 File newFile = null;
                 String fileName ="";
                 try {
-                    
                     fileName = directoryListing[i].getName().substring(12, 16)+
                         directoryListing[i].getName().substring(16, 18)+
                         directoryListing[i].getName().substring(18, 20);

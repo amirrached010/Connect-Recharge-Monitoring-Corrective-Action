@@ -6,6 +6,7 @@ package UpdateBalance;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -25,17 +26,20 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.Random;
-import javax.swing.text.Document;
-import javax.xml.parsers.*;
+import java.util.logging.Level;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.*;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.RollingFileAppender;
+import org.w3c.dom.NodeList;
 import org.xml.sax.*;
-
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 /**
  *
  * @author Omar.AlFar
@@ -46,81 +50,121 @@ public class SendThread implements Runnable {
     String serverUrl;
     ArrayList<String> inputList;
     String password;
-    String offerId;
+    
     String msisdn;
     Logger logger;
     String appenderName;
     Properties properties;
+    int counter;
     SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd'T'hh:mm:ss+0200");
     public SendThread(String url, ArrayList<String> inputList, String password,
-            Properties properties) {
+            Properties properties,int counter) {
         // this.request = request;
         this.serverUrl = url;
         this.inputList = inputList;
         this.password = password;
         this.properties = properties;
-        
+        this.counter= counter;
         intializeLogger();
+        
     }
 
     public void run() {
         
+        logger.debug("Starting the run method for Thread : "+appenderName);
         for(int i=0; i<inputList.size(); i++){
-            this.msisdn = inputList.get(i).split(",")[0];
-            this.offerId = inputList.get(i).split(",")[1];
+            this.msisdn = inputList.get(i);
+            logger.debug("Handling the MSISDN : " + this.msisdn);
+//            HashMap<String,String> ucip_inputs1 = new HashMap<String,String>();
+//            ucip_inputs1.put("$offerid",18192+"");
+//            String request1 = formatRequestV1(Globals.UCIPRequest.UpdateOfferWithExpiry,ucip_inputs1);
+//            logger.debug("Request Update Offer with offerId 18192: "+ request1);
+//            String response1 = sendRequest(request1);
+//            logger.debug("Response1 Update Offer with offerId 18192: "+parseResponse(response1));
+//            ucip_inputs1 = new HashMap<String,String>();
+//            ucip_inputs1.put("$offerid",18498+"");
+//            request1 = formatRequestV1(Globals.UCIPRequest.UpdateOffer,ucip_inputs1);
+//            logger.debug("Request Update Offer with offerId 18498: "+ request1);
+//            response1 = sendRequest(request1);
+//            logger.debug("response1 Update Offer with offerId 18498: "+ parseResponse(response1));
+//            ucip_inputs1 = new HashMap<String,String>();
+//            ucip_inputs1.put("$PAMServiceID",21+"");
+//            ucip_inputs1.put("$PAMCLASSID",20+"");
+//            ucip_inputs1.put("$PAMSCHEDULEID",3+"");
+//            request1 = formatRequestV1(Globals.UCIPRequest.AddPam,ucip_inputs1);
+//            response1 = sendRequest(request1);
+//            
+//            
             String response = "";
-        
-            String checkServiceClassRequest = formatRequestV1(Globals.UCIPRequest.GetAccountDetails);
-
-
-            response = sendRequest(checkServiceClassRequest);
-
-
-            String sc = parseSC(response);
-            logger.debug("The dial : "+ msisdn + " has SC : "+ sc);
-            if(Globals.suitableSCs.contains(sc)){
-                String request = formatRequestV1(Globals.UCIPRequest.UpdateOffer);
-
-
-                response = sendRequest(request);
-
-                String status = parseResponse(response);
-
-                if(status.equals("0")){
-                    sendSMS(msisdn+","+properties.getProperty("SMS_Script")+",2\n", 1);
-                    logger.debug("For msisdn : "+msisdn +" the offer : "+offerId+" was added successfully");
-                    String addPAMRequest = formatRequestV1(Globals.UCIPRequest.AddPam);
-                    response = sendRequest(addPAMRequest);
-                    status = parseResponse(response);
-                    if(status.equals("0"))
-                        logger.debug("PAM Added successfully for the dial : "+msisdn);
-                    else
-                    if(status.equals("190")){
-                        logger.debug("PAM already exists for the dial : "+ msisdn);
-                        String reset5Accumulators = formatRequestV1(Globals.UCIPRequest.ResetFiveAccumulator);
-                        logger.info(reset5Accumulators);
-                        response = sendRequest(reset5Accumulators);
-                        status = parseResponse(response);
-                        if(status.equals("0")){
-                            logger.debug("Accumulators resetted successfully for the dial : "+msisdn);
-
-                        }else {
-                            logger.debug("Error in Resetting Accumulators for the dial : "+msisdn + " Error Code : "+ status);
-                        }
-                    } else {
-                        logger.error("Error in adding PAM for the dial : "+ msisdn + " Error Code : "+ status);
+            String request = formatRequestV1(Globals.UCIPRequest.GetOffers,null);
+            logger.debug("Request for GetOffers ");
+            response = sendRequest(request);
+            String status = parseResponse(response);
+            logger.debug("Reponse for GetOffers : "+status);
+            if(status.equals("0")){
+                
+                String offers = parseGerOffers(response);
+                logger.debug("The Requested Offers : "+offers );
+                if(offers.contains(properties.getProperty("Connect_Suspension_Offer_ID"))){
+                    logger.debug("The msisdn "+this.msisdn + " has the suspension offer");
+                    HashMap<String,String> ucip_inputs = new HashMap<String,String>();
+                    if(offers.contains(properties.getProperty("Connect10L_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect10L_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect10L_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect10L_PAM_INDICATOR"));
                     }
-
-
-
-                }else {
-                    logger.debug("The dial : "+ msisdn + " has a responseCode for adding Offer : "+status );
+                    if(offers.contains(properties.getProperty("Connect25L_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect25L_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect25L_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect25L_PAM_INDICATOR"));
+                    }
+                    if(offers.contains(properties.getProperty("Connect50L_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect50L_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect50L_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect50L_PAM_INDICATOR"));
+                    }
+                    if(offers.contains(properties.getProperty("Connect100L_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect100L_Offer_ID"));  
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect100L_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect100L_PAM_INDICATOR"));
+                    }
+                    if(offers.contains(properties.getProperty("Connect150L_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect150L_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect150L_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect150L_PAM_INDICATOR"));
+                    }
+                    if(offers.contains(properties.getProperty("Connect10U_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect10U_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect10U_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect10U_PAM_INDICATOR"));
+                    }
+                    if(offers.contains(properties.getProperty("Connect15U_Offer_ID"))){
+                      logger.debug("The msisdn "+this.msisdn + " has the offer : "+properties.getProperty("Connect15U_Offer_ID"));
+                      ucip_inputs.put("$PAMServiceID",properties.getProperty("Connect15U_PAM_Service_ID"));
+                      ucip_inputs.put("$pamIndicator",properties.getProperty("Connect15U_PAM_INDICATOR"));
+                    }
+                    String RunPamRequest = formatRequestV1(Globals.UCIPRequest.RunPam,ucip_inputs);
+                    response = sendRequest(RunPamRequest);
+                    status = parseResponse(response);
+                    if(status.equals("0")){
+                        logger.debug("PAM Run Successefully on  dial : "+msisdn);
+                        logger.debug("PAM Service ID : "+properties.getProperty("Connect10L_PAM_Service_ID"));
+                        logger.debug("PAM Indicator ID : "+properties.getProperty("Connect10L_PAM_INDICATOR"));
+                    }else {
+                        logger.error("Failed to Run PAM on dial : "+msisdn +"with responseCode : "+ status);
+                        logger.debug("PAM Service ID : "+properties.getProperty("Connect10L_PAM_Service_ID"));
+                        logger.debug("PAM Indicator ID : "+properties.getProperty("Connect10L_PAM_INDICATOR"));
+                    }
+                    
+                    
+                }
+                else {
+                    logger.error("MSISDN : "+ this.msisdn + " doesn't have the blocking offer");
                 }
 
-
             }
-            else{
-                logger.error("Service Class : "+sc+" not configured");
+            else {
+                logger.error("MSISDN : "+ this.msisdn + " Get offers has response code : " + status);
             }
         }
         
@@ -238,7 +282,7 @@ public class SendThread implements Runnable {
 
         xml += String.format("<member><name>externalData2</name><value><string>CADEINSr</string></value></member>");
 
-        xml += String.format("<member><name>adjustmentAmountRelative</name><value><string>%s</string></value></member>", offerId);
+        //xml += String.format("<member><name>adjustmentAmountRelative</name><value><string>%s</string></value></member>", offerId);
 
 
         if (msisdn.startsWith("20")) {
@@ -252,24 +296,34 @@ public class SendThread implements Runnable {
 
     }
 
-    private String formatRequestV1(Globals.UCIPRequest ucipRequest){
+    private String formatRequestV1(Globals.UCIPRequest ucipRequest,HashMap<String,String> inputs){
         String updateBalanceAndDateRequest ="";
         updateBalanceAndDateRequest = readFromFile(new File(System.getProperty("user.dir")+"/Requests/"+ucipRequest+".txt")).toString();
+        updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$originTimeStamp",sdf.format(new Date()));
+        Calendar cal = Calendar.getInstance();
+        cal.add(Calendar.MONTH, 6);
+        java.util.Date dt = cal.getTime();
+        String currentDate = sdf.format(new Date());
         switch(ucipRequest){
             case UpdateOffer: 
-                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$offerID", offerId);
-                Calendar cal = Calendar.getInstance(); 
-                cal.add(Calendar.MONTH, 6);
-                java.util.Date dt = cal.getTime();
-                String currentDate = sdf.format(new Date());
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$offerID", inputs.get("$offerid"));
                 updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$startDateTime", currentDate);
                 currentDate = sdf.format(dt);
                 updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$expiryDateTime", currentDate);
                 break;
+            case UpdateOfferWithExpiry: 
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$offerID", inputs.get("$offerid"));
+                currentDate = sdf.format(dt);
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$expiryDate", currentDate);
+                break;
             case AddPam: 
-                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMServiceID", properties.getProperty("PAMServiceID"));
-                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMCLASSID", properties.getProperty("PAMClassID"));
-                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMSCHEDULEID", properties.getProperty("PAMScheduleID"));
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMServiceID", inputs.get("$PAMServiceID"));
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMCLASSID", inputs.get("$PAMCLASSID"));
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$PAMSCHEDULEID", inputs.get("$PAMSCHEDULEID"));
+                break;
+            case RunPam: 
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$pamServiceID", inputs.get("$PAMServiceID"));
+                updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$pamIndicator",inputs.get("$pamIndicator"));
                 break;
             case ResetFiveAccumulator:
                 updateBalanceAndDateRequest = updateBalanceAndDateRequest.replace("$AccumulatorID_1", properties.getProperty("AccumulatorID_1"));
@@ -304,6 +358,38 @@ public class SendThread implements Runnable {
             status = "-1";
         }
         return status;
+    }
+    
+    private String parseGerOffers(String response){
+        if (response.length() > 0) {
+            DocumentBuilderFactory builderFactory =DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = null;
+            try {
+                builder = builderFactory.newDocumentBuilder();
+            } catch (ParserConfigurationException e) {
+                e.printStackTrace();  
+            }
+            try {
+                org.w3c.dom.Document xmlDocument = builder.parse(new ByteArrayInputStream(response.getBytes()));
+                XPath xPath =  XPathFactory.newInstance().newXPath();
+                String expression = "/methodResponse/params/param/value/struct/member[name='offerInformation']/value/array/data/value/struct/member[name='offerID']/value/i4";
+                NodeList nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+                String asm = "";
+                for (int i = 0; i < nodeList.getLength(); i++) {
+                    asm+=(nodeList.item(i).getFirstChild().getNodeValue())+";"; 
+                }
+                return asm;
+
+            } catch (SAXException ex) {
+                java.util.logging.Logger.getLogger(SendThread.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                java.util.logging.Logger.getLogger(SendThread.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (XPathExpressionException ex) {
+                java.util.logging.Logger.getLogger(SendThread.class.getName()).log(Level.SEVERE, null, ex);
+            }
+
+        } 
+        return null;
     }
     
     private String parseSC(String response){
@@ -361,11 +447,10 @@ public class SendThread implements Runnable {
 
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
         RollingFileAppender appender = new RollingFileAppender();
-        
         appender.setAppend(true);
         appender.setMaxFileSize("1MB");
         appender.setMaxBackupIndex(1);
-        String fileName="logs/GreyAcquisitions_ThreadLog_"+dateFormat.format(new Date())+"_"+this.msisdn;
+        String fileName="logs/ThreadLog_"+counter+"_"+dateFormat.format(new Date());
         appenderName = fileName;
         appender.setName(appenderName);
         logger = Logger.getLogger(fileName);    
@@ -387,13 +472,13 @@ public class SendThread implements Runnable {
         File resultFile = null;
         File newFile  = null;
         if(Util.getOSType() == Globals.OS_UNIX){
-            currentFileName = Globals.SMS_PREPARATION_DIRECTORY+"GreyAcquisitions_"+sdf.format(new Date())+"_L"+lineCounter+"_V"+this.inputList+".txt";
+            currentFileName = Globals.SMS_PREPARATION_DIRECTORY+"AirTool_"+sdf.format(new Date())+"_L"+lineCounter+"_V"+this.inputList+".txt";
             resultFile = new File(currentFileName);
             newFile = new File(Globals.SMS_DIRECTORY+resultFile.getName());
                     
         }
         else{
-            currentFileName = Globals.SMS_PREPARATION_DIRECTORY+"GreyAcquisitions_"+sdf.format(new Date())+"_L"+lineCounter+"_V"+this.inputList+".txt";
+            currentFileName = Globals.SMS_PREPARATION_DIRECTORY+"AirTool_"+sdf.format(new Date())+"_L"+lineCounter+"_V"+this.inputList+".txt";
             resultFile = new File(currentFileName);
             newFile = new File(Globals.SMS_DIRECTORY+resultFile.getName());
         }
